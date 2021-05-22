@@ -30,7 +30,9 @@
               :key="colInfo.index"
               :label="colInfo.index"
               :disabled="colInfo.disabled"
-            >{{ colInfo.label }}</el-checkbox>
+            >
+              {{ colInfo.label }}
+            </el-checkbox>
           </el-checkbox-group>
         </el-popover>
       </template>
@@ -115,9 +117,11 @@ export default {
       this.oprColumns(willHideIndexs, false)
     },
     data: {
-      handler(newVal, oldVal) {
-        this.data = newVal
+      handler() {
         this.getSpanObj()
+        this.$nextTick(() => {
+          this.doLayout()
+        })
       },
       deep: true
     }
@@ -126,54 +130,53 @@ export default {
     this.getSpanObj()
   },
   mounted() {
-    if (this.dynamicColumnSetting && this.$refs.PTable.$slots.default) {
-      let index = 0
-      this.$refs.PTable.$slots.default.forEach(columnIns => {
-        if (!columnIns.componentOptions) return
-        const props = columnIns.componentOptions.propsData
-        if (
-          props.label === undefined &&
-          props.type !== 'selection' &&
-          props.type !== 'index'
-        ) return
-        // 保存所有列的信息
-        const label =
+    this.initDynamicColumnSetting()
+  },
+  methods: {
+    getSpanObj() {
+      // 动态渲染 请渲染数剧结束后在执行此方法
+      if (this.enableMergeable && this.data.length > 0) {
+        this.spanObj = getSpanObj(this.data, this.mergeableColumns)
+      }
+    },
+    // 初始化合并列的设置
+    initDynamicColumnSetting() {
+      if (this.dynamicColumnSetting && this.$refs.PTable.$slots.default) {
+        let index = 0
+        this.$refs.PTable.$slots.default.forEach(columnIns => {
+          if (!columnIns.componentOptions) return
+          const props = columnIns.componentOptions.propsData
+          if (
+            props.label === undefined &&
+            props.type !== 'selection' &&
+            props.type !== 'index'
+          ) return
+          // 保存所有列的信息
+          const label =
             props.type === 'selection'
               ? '多选框'
               : props.type === 'index'
                 ? '索引'
                 : props.label
-        // 默认多选框和索引不可隐藏
-        const disabled = !!(props.type === 'selection' || props.type === 'index')
-        this.columnInfos.push({
-          label: label,
-          index: index,
-          disabled: disabled
+          // 默认多选框和索引不可隐藏
+          const disabled = !!(props.type === 'selection' || props.type === 'index')
+          this.columnInfos.push({
+            label: label,
+            index: index,
+            disabled: disabled
+          })
+          // 记录初始展示的列的下标
+          if (this.hidenColumnIndexs.indexOf(index) === -1) {
+            this.visibleIndexs.push(index)
+          }
+          index++
         })
-        // 记录初始展示的列的下标
-        if (this.hidenColumnIndexs.indexOf(index) === -1) {
-          this.visibleIndexs.push(index)
-        }
-        index++
-      })
-      // 处理总是显示的列（不可隐藏的列）
-      this.alwaysShowColumnIndexs.forEach(index => {
-        this.columnInfos[index].disabled = true
-      })
-      // 处理初始隐藏的列
-      this.oprColumns(this.hidenColumnIndexs, false)
-    }
-  },
-  beforeUpdate() {
-    this.$nextTick(() => {
-      this.$refs.PTable.doLayout()
-    })
-  },
-  methods: {
-    getSpanObj() {
-      // 动态渲染 请渲染数剧结束后在执行此方法
-      if (this.enableMergeable) {
-        this.spanObj = getSpanObj(this.data, this.mergeableColumns)
+        // 处理总是显示的列（不可隐藏的列）
+        this.alwaysShowColumnIndexs.forEach(index => {
+          this.columnInfos[index].disabled = true
+        })
+        // 处理初始隐藏的列
+        this.oprColumns(this.hidenColumnIndexs, false)
       }
     },
     oprColumns(indexs, isShow) {
@@ -181,15 +184,44 @@ export default {
         this.$set(this.columnVisibles, index, isShow)
       })
     },
-    objectSpanMethod({ row, column, rowIndex, columnIndex }) {
+    objectSpanMethod({ column, rowIndex }) {
       if (this.enableMergeable) {
         // 列合并
         if (rowIndex >= Number(this.startRowIndex)) {
-          const rowspan = this.spanObj[column.property] ? this.spanObj[column.property][rowIndex] : 1
+          const item = this.spanObj[column.property]
+          const rowspan = item ? item[rowIndex] : 1
           const colspan = rowspan > 0 ? 1 : 0
           return { rowspan, colspan }
         }
       }
+    },
+    // 以下是el-table的方法(参考：https://element.eleme.cn/2.11/#/zh-CN/component/table)
+    clearSelection() {
+      this.$refs.PTable.clearSelection()
+    },
+    toggleRowSelection(row, selected) {
+      this.$refs.PTable.toggleRowSelection(row, selected)
+    },
+    toggleAllSelection() {
+      this.$refs.PTable.toggleRowSelection()
+    },
+    toggleRowExpansion(row, expanded) {
+      this.$refs.PTable.toggleRowExpansion(row, expanded)
+    },
+    setCurrentRow(row) {
+      this.$refs.PTable.setCurrentRow(row)
+    },
+    clearSort() {
+      this.$refs.PTable.clearSort()
+    },
+    clearFilter(columnKey) {
+      this.$refs.PTable.clearFilter(columnKey)
+    },
+    doLayout() {
+      this.$refs.PTable.doLayout()
+    },
+    sort(prop, order) {
+      this.$refs.PTable.sort(prop, order)
     }
   }
 }
